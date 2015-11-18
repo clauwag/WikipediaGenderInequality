@@ -1,0 +1,8 @@
+ Made available under the terms of GNU General Public License. They are distributed without any warranty.
+
+The Subjectivity Lexicon (list of subjectivity clues) that is part of OpinionFinder is also available for separate download. These clues were compiled from several sources (see the enclosed README). This is the version of the lexicon used in:
+
+Theresa Wilson, Janyce Wiebe, and Paul Hoffmann (2005). Recognizing Contextual Polarity in Phrase-Level Sentiment Analysis. Proc. of HLT-EMNLP-2005.  
+
+See:
+http://mpqa.cs.pitt.edu/lexicons/subj_lexicon/

@@ -1,0 +1,257 @@
+---
+title: "Linguistic Intergroup Bias in Wikipedia"
+author: "Claudia Wagner, Eduardo Graells, David Garcia "
+date: "17.11.2015"
+output:
+  pdf_document:
+    fig_caption: yes
+    keep_tex: yes
+---
+
+# Wikipedia
+
+```{r Process, engine='python', cache=TRUE, echo=FALSE, warning=FALSE, eval=FALSE}
+# THIS CODE CAN BE RUN APART IN LIB_Process_text.py. Its output is data/textData.dat, already provided
+import csv
+import gzip
+import nltk
+from nltk.tag import pos_tag, map_tag
+from nltk.stem.wordnet import WordNetLemmatizer
+
+#load subjectivity dictionary
+fin = open("Tools/subjclueslen1-HLTEMNLP05.tff","rt")
+subjdic = dict()
+for line in fin:
+  fields = line.split(" ")
+  contdic = dict()
+  for field in fields:
+    parts = field.split("=")
+    if len(parts) == 2:
+      contdic[parts[0]] = parts[1]
+  w = contdic["word1"]
+  subjdic[w] = contdic["type"], contdic["pos1"], contdic["priorpolarity"].replace("\n", "")
+fin.close()
+
+
+fout = open("../data/textData.dat", "w")
+fout.write( "gender" + "\t" + "nwords" + "\t" +  "nadj"  + "\t" +  "nverb"  + "\t" + "nweaksub" + "\t" + "nstrongsub" + "\t" + "npos" + "\t" + "nneg" + "\t" + "nweaksubadj" + "\t" + "nstrongsubadj" + "\t" + "nweaksubverb" + "\t" + "nstrongsubverb" + "\t" + "nposadj" + "\t" + "nnegadj" + "\t" + "nposverb" + "\t" + "nnegverb"  + "\n") 
+
+for i in range(1,5):
+  print i
+	fin = gzip.open("../data/person_text_"+str(i)+".csv.gz", "rb")
+	csvreader = csv.reader(fin, delimiter=',', quotechar='"')
+	#uri,wikidata_entity,class,gender,edition_count,available_english,available_editions,birth_year,death_year,page_length,page_out_degree,label,abstract
+
+	for fields in csvreader:
+	  gender = fields[3]
+	  text = fields[12].decode("utf8").replace("\n", "").replace('"', '')
+	  texttokens = nltk.word_tokenize(text)
+	  posTagged = pos_tag(texttokens)
+	  simplifiedTags = [(word, map_tag('en-ptb', 'universal', tag)) for word, tag in posTagged]
+	  nadj = nverb = nwords =  0
+	  nweaksub = nstrongsub = 0
+	  npos = nneg = 0
+	  nweaksubadj = nstrongsubadj = nweaksubverb = nstrongsubverb = 0
+	  nposadj = nnegadj = nposverb = nnegverb = 0
+
+	  for tag in simplifiedTags :
+	    if tag[1] != ".":
+	      nwords +=1
+	      word = tag[0].lower()
+
+	      sv = subjdic.get(word, -1)
+	      type = pos = polarity = ""
+	      if sv != -1:
+	        type= sv[0]
+	        pos = sv[1]    # adj verb
+	        polarity = sv[2]
+
+	      if type == "weaksubj":
+	        nweaksub += 1
+	      if type == "strongsubj":
+	        nstrongsub += 1
+	      if polarity == "positive":
+	        npos +=1
+	      if polarity == "negative":
+	        nneg +=1
+	      if polarity == "both":
+	        nneg +=1
+	        npos +=1
+
+	      if tag[1] == "ADJ":
+	        nadj +=1
+	        if type == "weaksubj":
+	          nweaksubadj += 1
+	        if type == "strongsubj":
+	          nstrongsubadj += 1
+	        if polarity == "positive":
+	          nposadj +=1
+	        if polarity == "negative":
+	          nnegadj +=1
+	        if polarity == "both":
+	          nnegadj +=1
+	          nposadj +=1
+
+	      if tag[1] == "VERB":
+	        nverb +=1
+	        if type == "weaksubj":
+	          nweaksubverb += 1
+	        if type == "strongsubj":
+	          nstrongsubverb += 1
+	        if polarity == "positive":
+	          nposverb +=1
+	        if polarity == "negative":
+	          nnegverb +=1
+	        if polarity == "both":
+	          nnegverb +=1
+	          npos +=1
+
+	  fout.write(gender +"\t" + str(nwords) + "\t" +  str(nadj)  + "\t" +  str(nverb) + "\t" + str(nweaksub) + "\t" + str(nstrongsub) + "\t" + str(npos) + "\t" + str(nneg) + "\t" + str(nweaksubadj) + "\t" + str(nstrongsubadj) + "\t" + str(nweaksubverb) + "\t" + str(nstrongsubverb) + "\t" + str(nposadj) + "\t" + str(nnegadj) + "\t" + str(nposverb) + "\t" + str(nnegverb) + "\n") 
+
+	fin.close()
+
+
+fout.close()
+```
+
+
+# Chisq tests
+
+```{r Stats, cache=TRUE, echo=FALSE, warning=FALSE}
+
+library(xtable)
+library(texreg)
+df <- read.table("../data/textData.dat", sep="\t", header=TRUE)
+#class year gender  nwords  nadj    nverb   nweaksub        nstrongsub      npos    nneg    nweaksubadj     nstrongsubadj   nweaksubverb    nstrongsubverb  nposadj nnegadj nposverb        nnegverb
+attach(df)
+
+prop.test( c(sum(nposadj[gender=="male"]),sum(nposadj[gender=="female"])), c(sum(npos[gender=="male"]), sum(npos[gender=="female"])), alternative="greater")
+
+p0 <- sum(nposadj)/sum(npos)
+p1 <- sum(nposadj[gender=="male"])/sum(npos[gender=="male"])
+p2 <- sum(nposadj[gender=="female"])/sum(npos[gender=="female"])
+print(paste("Cohen's W:", sqrt(((p0-p1)^2 + (p0-p2)^2)/p0)))
+print(paste("% Change:", (p1-p2)/p1 * 100))
+
+prop.test( c(sum(nnegadj[gender=="male"]),sum(nnegadj[gender=="female"])), c(sum(nneg[gender=="male"]), sum(nneg[gender=="female"])), alternative="less")
+
+p0 <- sum(nnegadj)/sum(nneg)
+p1 <- sum(nnegadj[gender=="male"])/sum(nneg[gender=="male"])
+p2 <- sum(nnegadj[gender=="female"])/sum(nneg[gender=="female"])
+print(paste("Cohen's W:", sqrt(((p0-p1)^2 + (p0-p2)^2)/p0)))
+print(paste("% Change:", (p1-p2)/p1 * 100))
+
+```
+\newpage 
+
+
+# Linear regression
+
+
+```{r Stats2, cache=TRUE, echo=FALSE, warning=FALSE, results='asis'}
+
+library(xtable)
+library(texreg)
+df <- read.table("../data/textData.dat", sep="\t", header=TRUE)
+#class year gender  nwords  nadj    nverb   nweaksub        nstrongsub      npos    nneg    nweaksubadj     nstrongsubadj   nweaksubverb    nstrongsubverb  nposadj nnegadj nposverb        nnegverb
+attach(df)
+
+f <- npos>0 & !is.na(year) & nwords >=250 #& nposadj != npos & nposadj >0
+posabs <- (nposadj/npos)[f]
+c <- class[f]
+y <- year[f]
+cent <- floor(y/100)
+G <- rep(0,sum(f))
+G[gender[f] == "female"] <- 1
+lin1 <- glm(posabs~G)
+lin2 <- glm(posabs~G+c)
+lin3 <- glm(posabs~G+c+cent)
+texreg(list(lin1,lin2,lin3), digits=6, single.row=TRUE)
+
+
+f <- nneg>0 & !is.na(year) & nwords >=250 #& nnegadj != nneg & nnegadj >0
+negabs <- (nnegadj/nneg)[f]
+c <- class[f]
+y <- year[f]
+cent <- floor(y/100)
+G <- rep(0,sum(f))
+G[gender[f] == "female"] <- 1
+lin1 <- glm(negabs~G)
+lin2 <- glm(negabs~G+c)
+lin3 <- glm(negabs~G+c+cent)
+texreg(list(lin1,lin2,lin3), digits=6, single.row=TRUE)
+
+```
+
+\newpage 
+
+#Logit transformed
+
+```{r Stats2B, cache=TRUE, echo=FALSE, warning=FALSE, results='asis'}
+
+################################
+
+
+f <- npos>0 & !is.na(year) & nwords >=250 & nposadj != npos & nposadj >0
+posabs <- (nposadj/npos)[f]
+posabs <- log(posabs/(1-posabs))
+c <- class[f]
+y <- year[f]
+cent <- floor(y/100)
+G <- rep(0,sum(f))
+G[gender[f] == "female"] <- 1
+lin1 <- glm(posabs~G)
+lin2 <- glm(posabs~G+c)
+lin3 <- glm(posabs~G+c+cent)
+texreg(list(lin1,lin2,lin3), digits=6, single.row=TRUE)
+
+
+f <- nneg>0 & !is.na(year) & nwords >=250 & nnegadj != nneg & nnegadj >0
+negabs <- (nnegadj/nneg)[f]
+negabs <- log(negabs/(1-negabs))
+c <- class[f]
+y <- year[f]
+cent <- floor(y/100)
+G <- rep(0,sum(f))
+G[gender[f] == "female"] <- 1
+lin1 <- glm(negabs~G)
+lin2 <- glm(negabs~G+c)
+lin3 <- glm(negabs~G+c+cent)
+texreg(list(lin1,lin2,lin3), digits=6, single.row=TRUE)
+
+
+```
+
+\newpage 
+
+#Beta regression
+
+```{r Statsbeta, cache=TRUE, echo=FALSE, warning=FALSE}
+
+################################3
+library(betareg)
+
+f <- npos>0 & !is.na(year) & nwords >=250 & nposadj != npos & nposadj >0
+posabs <- (nposadj/npos)[f]
+c <- class[f]
+y <- year[f]
+cent <- floor(y/100)
+G <- rep(0,sum(f))
+G[gender[f] == "female"] <- 1
+lin3 <- betareg(posabs~G+c+cent)
+confint(lin3)
+
+
+f <- nneg>0 & !is.na(year) & nwords >=250 & nnegadj != nneg & nnegadj >0
+negabs <- (nnegadj/nneg)[f]
+c <- class[f]
+y <- year[f]
+cent <- floor(y/100)
+G <- rep(0,sum(f))
+G[gender[f] == "female"] <- 1
+lin3 <- betareg(negabs~G+c+cent)
+confint(lin3)
+
+
+
+```
