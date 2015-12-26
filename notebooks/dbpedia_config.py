@@ -6,7 +6,7 @@ LANGUAGES = 'en|bg|ca|cs|de|es|eu|fr|hu|id|it|ja|ko|nl|pl|pt|ru|tr|ar|el'.split(
 DATA_FOLDER = '/home/egraells/resources/dbpedia'
 
 # Folder to store analysis results
-TARGET_FOLDER = './person_results'
+TARGET_FOLDER = '/home/egraells/phd/notebooks/pajaritos/person_results'
 
 # This is used when crawling WikiData.
 QUERY_WIKIDATA_GENDER = False
