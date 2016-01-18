@@ -142,12 +142,12 @@ class GoogleTrendCrawler:
             else:
                 # make request
                 try:
-                    self.connector.request_report([name])
+                    self.connector.request_report(name)
                 except UnicodeEncodeError:
 
                     try:
                         print "encoding problems with encoding of name %s" % name.encode('cp1252')
-                        self.connector.request_report([name.encode('cp1252')]) #, "book"
+                        self.connector.request_report(name.encode('cp1252')) #, "book"
                     except UnicodeEncodeError:
                          logfile.write("failed 1 + %s"%name)
                 except urllib2.HTTPError, e:
