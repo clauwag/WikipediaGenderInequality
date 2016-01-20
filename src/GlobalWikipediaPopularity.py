@@ -1,6 +1,6 @@
 from __future__ import print_function
 
-__author__ = 'wagnerca'
+__author__ = 'claudia wagner'
 
 import pandas as pd
 import numpy as np
@@ -26,7 +26,6 @@ class GlobalWikipediaPopularity:
 
         self.people = self.people[~pd.isnull(self.people.birth_year) & (self.people.birth_year <= 2015)]
 
-
         # Create 'decade' and 'century' column
         self.people['birth_decade'] = np.round(np.floor((self.people['birth_year']/10))*10)
         self.people['birth_century'] = np.round(np.floor((self.people['birth_year']/100))*100)
@@ -36,11 +35,12 @@ class GlobalWikipediaPopularity:
         if start >= 0 and end >= 0:
             self.pre = str(start)
             self.post = str(end)
-            recent_people = self.people[(self.people.birth_year >= start) & (self.people.birth_year <= end)]
+            recent_people = self.people[(self.people.birth_year > start) & (self.people.birth_year <= end)]
             self.people = recent_people
             print ("num people born between %s and %s century %s "%(start, end, len(self.people.index)))
             print ("num people born between %s and %s century %s "%(start, end, len(recent_people.index)))
-            print ("num people for which gender is available AND they are born between %s and 2000 %s "%(year, len( recent_people[(recent_people.gender == "male") | (recent_people.gender == "female")])))
+            print ("num people for which gender is available AND they are born between %s and 2015: %s "
+			%(year, len( recent_people[(recent_people.gender == "male") | (recent_people.gender == "female")])))
 
 
         self.logfile = file("img/results-numlang"+self.pre+"-"+self.post+".txt", "w+")
@@ -93,7 +93,7 @@ class GlobalWikipediaPopularity:
         resdict = self.analyze_num_lang_edition("0-1000", people)
         res = res.append(resdict, ignore_index = True)
 
-        while (decade < 2010):
+        while (decade < 2015):
 
             end  = decade+interval
 
@@ -105,14 +105,7 @@ class GlobalWikipediaPopularity:
             res = res.append(resdict, ignore_index = True)
             decade = end
 
-        print (res.head())
-        #print "res shape"
-        #print res.shape
-        #res = res[np.isfinite(res["sem-women"])]
-        #res = res[np.isfinite(res["sem-men"])]
-        #print "res shape after removing infinite rows"
-        #print res.shape
-        #print res.info()
+     
         ut.plot_shaded_lines(res["class"].values, res["mean-women"].values, res["mean-men"].values, res["sem-women"].values, res["sem-women"].values, 'Mean Num Editions', 'Birth Year',
                              'img/numedition_gender_deacdes'+self.pre+"-"+self.post+'.png')
 
@@ -356,12 +349,12 @@ if __name__ == "__main__":
 
     # analyze all data without restricting start and end by birth year
     pop = GlobalWikipediaPopularity('data/consolidated_person_data.csv', -1, -1)
-    pop.analyze_numlangedition_per_profession()
-    pop.analyze_numlangedition_per_decade()
+   # pop.analyze_numlangedition_per_profession()
+   # pop.analyze_numlangedition_per_decade()
 
     # select interval in which people should be born
     startyears  = [1900]
-    endyear = 2000
+    endyear = 2015
     for year in startyears:
         pop = GlobalWikipediaPopularity('data/consolidated_person_data.csv', year, endyear)
         print (pop.people.shape)

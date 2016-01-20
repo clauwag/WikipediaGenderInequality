@@ -1,6 +1,15 @@
-__author__ = 'wagnerca'
+# encoding=utf8
+import sys
 
-from pytrends.pyGTrends import pyGTrends
+reload(sys)
+sys.setdefaultencoding('utf8')
+
+
+
+import requests
+import json
+
+
 import time
 from random import randint
 import pandas as pd
@@ -19,16 +28,15 @@ class GoogleTrendCrawler:
     def __init__(self, path, startyear):
         self.startyear = startyear
 
-        # ADD YOUR ACCOUNT INFOS
-        self.google_username = ""
-        self.google_password = ""
-
         if not os.path.exists(path):
             os.mkdir(path)
         self.logfilename = path+"log-fails.txt"
 
-        self.connector = pyGTrends(self.google_username, self.google_password)
+        self.html_base = u"http://www.google.com/trends/fetchComponent?q="
+
+        self.query_type = u"&cid=TIMESERIES_GRAPH_0&export=3"
         self.path = path
+        self.headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
 
 
 
@@ -77,6 +85,8 @@ class GoogleTrendCrawler:
             print "select people"
             people = self.create_sample(N, allpeople, self.path)
 
+        #people = people.shuffle(axis=0)
+        #print people.head()
         self.run(people, self.path)
 
 
@@ -107,6 +117,16 @@ class GoogleTrendCrawler:
 
 
 
+    def crawl_nobelprize_winner(self):
+
+        allpeople = pd.read_csv('data/nobel_identifier_all.csv', delimiter=",", header=None)
+
+        allpeople.columns = ["name", "freebase", "year"]
+        print "start crawling %s randomly selected people"%len(allpeople)
+        print allpeople.head(n=1)
+        print allpeople.shape
+        self.run(allpeople, self.path)
+
 
     def run(self, people, path):
         logfile = open(self.logfilename, 'w+')
@@ -134,57 +154,55 @@ class GoogleTrendCrawler:
             # remove stuff after the comma e.g. James Dean, King from Sweden
             name = re.sub(r',\s*.+', ' ', name)
 
-            if os.path.isfile(path+ind+".csv"):
+            #name = name.encode("utf8")
+            #name = unicode(name, 'cp1252')
+
+            if os.path.isfile(path+ind+".json"):
                 print "found & rename"
-                os.rename(path+ind+".csv", path+name.replace('/', '')+".csv")
-            elif os.path.isfile(path+(name.replace('/', ''))+".csv"):
+                os.rename(path+ind+".json", path+name.replace('/', '')+".json")
+            elif os.path.isfile(path+(name.replace('/', ''))+".json"):
                 print "found "
+                #os.rename(path+(name.replace('/', ''))+".json", path+ind+".json")
             else:
                 # make request
                 try:
-                    self.connector.request_report(name)
-                except UnicodeEncodeError:
+                    #q = u"asdf,qwerty"
+                    full_query = self.html_base + name + self.query_type
+                    print(full_query)
 
-                    try:
-                        print "encoding problems with encoding of name %s" % name.encode('cp1252')
-                        self.connector.request_report(name.encode('cp1252')) #, "book"
-                    except UnicodeEncodeError:
-                         logfile.write("failed 1 + %s"%name)
-                except urllib2.HTTPError, e:
-                    print e.code
-                except urllib2.URLError, e:
-                    print e.args
+                    # set header to pretend a user-visit
+                    response = requests.get(full_query, headers=self.headers)
 
+                    print(response.status_code)
+                    with open(path+name.replace('/', '')+".json", 'w') as outfile:
+                        if response.status_code == 200:
+                            # no data found
+                            outfile.write(response.text.encode("utf8"))
+                            outfile.close()
+
+                        elif response.status_code == 203:
+                            if response.content.startswith("<!DOCTYPE html>"):
+                                # quota limit
+                                outfile.close()
+                                os.remove(path+name.replace('/', '')+".json")
+                                time.sleep(randint(10,30))
+                            else:
+                                print (response.content)
+                                data = json.loads(response.text.encode("utf8"))
+                                json.dump(data, outfile)
+
+                except Exception:
+                         logfile.write("\n%s"%name)
 
                 # wait a random amount of time between requests to avoid bot detection
-                time.sleep(randint(10,70))
+                #time.sleep(randint(10,10)) #30
 
-                # download file
-                try:
-                    self.connector.save_csv(path, name.replace('/', '')) #name.replace('/', ''))
-                except UnicodeEncodeError:
-                    try:
-                        self.connector.save_csv(path, name.replace('/', '')).encode('cp1252')# (name.replace('/', ''))
-                    except UnicodeEncodeError:
-                        logfile.write("failed 2: %s"%name)
 
-                except UnicodeDecodeError:
-                    try:
-                        reload(sys)
-                        sys.setdefaultencoding('cp1252')
-                        print "decoding problems when saving file %s" % (ind).decode('cp1252').encode('cp1252')
-                        #connector.save_csv(path, name.encode('cp1252'))
-                        self.connector.save_csv(path, (name.replace('/', '')).decode('cp1252'))
-                    except UnicodeDecodeError:
-                        print "UnicodeDecodeError"
-                    except UnicodeEncodeError:
-                         logfile.write("failed 3: %s"%name)
 
         logfile.close()
 
-
-
 if __name__ == "__main__":
+
     startyear = 1900
     crawler = GoogleTrendCrawler('data/trends-sample-birth'+str(startyear)+'/', startyear)
     crawler.crawl_wikipedia_people(2000, 'data/consolidated_person_data.csv', True)
